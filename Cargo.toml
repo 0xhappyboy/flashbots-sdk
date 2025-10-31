@@ -1,7 +1,13 @@
 [package]
 name = "flashbots-sdk"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
+authors = ["happyboy <superhappyboy1995@gmail.com>"]
+description = "A Rust SDK for interacting with the Flashbots relay, providing functionality for building, signing, sending, and monitoring transaction packages."
+keywords = ["trade", "crypto", "finance", "evm", "flashbots"]
+license = "GPL-3.0"
+readme = "README.md"
+repository = "https://github.com/0xhappyboy/flashbots-sdk"
 
 [dependencies]
 ethers = { version = "2.0", features = ["ws", "openssl", "rustls"] }
