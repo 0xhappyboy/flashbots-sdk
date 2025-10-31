@@ -16,13 +16,13 @@ A Rust SDK for interacting with the Flashbots relay, providing functionality for
 
 ## Features
 
-- 🚀 完整的 Flashbots API 支持
-- 🔐 安全的交易签名和验证
-- 📦 流畅的交易包构建器
-- ⚡ 异步/等待支持
-- 🔄 自动重试机制
-- 🧪 交易模拟和验证
-- 📊 丰富的统计和监控功能
+- 🚀 Full Flashbots API support
+- 🔐 Secure transaction signing and verification
+- 📦 Smooth transaction package builder
+- ⚡ Asynchronous/wait support
+- 🔄 Automatic retry mechanism
+- 🧪 Transaction demoting and verification
+- 📊 Rich statistics and monitoring functions
 
 ## Example
 

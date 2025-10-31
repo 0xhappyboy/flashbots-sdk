@@ -1,6 +1,6 @@
 [package]
 name = "flashbots-sdk"
-version = "0.2.0"
+version = "0.2.6"
 edition = "2024"
 authors = ["happyboy <superhappyboy1995@gmail.com>"]
 description = "A Rust SDK for interacting with the Flashbots relay, providing functionality for building, signing, sending, and monitoring transaction packages."
