@@ -1,4 +1,4 @@
-use crate::global::{GOERLI_TEST_URL, MAIN_URL, SEPOLIA_TEST_URL};
+use crate::global::{MAIN_URL, SEPOLIA_TEST_URL};
 use crate::types::{
     BlockResponse, Bundle, BundleByHashResponse, BundlePriceResponse, BundleReceipt, BundleStats,
     CancelBundlesRequest, CancelBundlesResponse, FlashbotsError, GasPriceResponse, RelayInfo,
@@ -58,14 +58,6 @@ impl FlashbotsClient {
     pub fn new_mainnet() -> Self {
         Self::new(FlashbotsClientConfig {
             base_url: MAIN_URL.to_string(),
-            ..Default::default()
-        })
-    }
-
-    /// Creates a new client configured for Goerli testnet
-    pub fn new_goerli() -> Self {
-        Self::new(FlashbotsClientConfig {
-            base_url: GOERLI_TEST_URL.to_string(),
             ..Default::default()
         })
     }
