@@ -1015,6 +1015,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm-client"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e5d90e4a220f4811b882f58a1047483c44659d84690216acc43ee436a816b75"
+dependencies = [
+ "ethers",
+]
+
+[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1069,6 +1078,7 @@ name = "flashbots-sdk"
 version = "0.1.0"
 dependencies = [
  "ethers",
+ "evm-client",
  "hex",
  "log",
  "reqwest",
