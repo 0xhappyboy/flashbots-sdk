@@ -1,9 +1,11 @@
 use crate::global::{GOERLI_TEST_URL, MAIN_URL, SEPOLIA_TEST_URL};
 use crate::types::{
-    Bundle, BundlePriceResponse, BundleReceipt, BundleStats, FlashbotsError,
-    SimulateBundleResponse, UserStats,
+    BlockResponse, Bundle, BundleByHashResponse, BundlePriceResponse, BundleReceipt, BundleStats,
+    CancelBundlesRequest, CancelBundlesResponse, FlashbotsError, GasPriceResponse, RelayInfo,
+    SimulateBundleResponse, UserStats, UserStatus,
 };
 use crate::types::{FlashbotsResult, SendBundleResponse, SimulateBundleRequest};
+use ethers::core::k256::elliptic_curve::rand_core::block;
 use ethers::types::{Address, H256, U64};
 use reqwest::Client;
 use serde_json::Value;
@@ -400,6 +402,256 @@ impl FlashbotsClient {
     /// Creates a new client instance with different configuration
     pub fn with_config(&self, config: FlashbotsClientConfig) -> Self {
         Self::new(config)
+    }
+
+    /// Send the raw transaction packet (low-level API)
+    pub async fn send_raw_bundle(&self, raw_bundle: Value) -> FlashbotsResult<SendBundleResponse> {
+        let url = format!("{}/", self.config.base_url);
+        self.post(&url, &raw_bundle).await
+    }
+
+    /// Cancel submitted transaction package
+    ///
+    /// # Example
+    /// ```
+    /// let client = FlashbotsClient::new_mainnet();
+    /// let bundle_hashes = vec![H256::zero()]; // Transaction package hash
+    /// let result = client.cancel_bundles(bundle_hashes).await?;
+    /// println!("Cancel result: {}", result.success);
+    /// ```
+    pub async fn cancel_bundles(
+        &self,
+        bundle_hashes: Vec<H256>,
+    ) -> FlashbotsResult<CancelBundlesResponse> {
+        let url = format!("{}/cancelBundles", self.config.base_url);
+        let request = CancelBundlesRequest { bundle_hashes };
+        self.post(&url, &request).await
+    }
+
+    /// Retrieve transaction package details and receipts using transaction package hash.
+    pub async fn get_bundle_by_hash(
+        &self,
+        bundle_hash: H256,
+    ) -> FlashbotsResult<BundleByHashResponse> {
+        let url = format!(
+            "{}/bundleByHash/0x{}",
+            self.config.base_url,
+            hex::encode(bundle_hash.as_bytes())
+        );
+        self.get(&url).await
+    }
+
+    /// Get detailed information of a specified block
+    ///
+    /// # Example
+    /// ```
+    /// let client = FlashbotsClient::new_mainnet();
+    /// let block_number = U64::from(17000000u64);
+    /// let block_info = client.get_block(block_number).await?;
+    /// println!("Block miner: {:?}", block_info.miner);
+    /// ```
+    pub async fn get_block(&self, block_number: U64) -> FlashbotsResult<BlockResponse> {
+        let url = format!("{}/block/{}", self.config.base_url, block_number);
+        self.get(&url).await
+    }
+
+    /// Get the latest block information
+    pub async fn get_latest_block(&self) -> FlashbotsResult<BlockResponse> {
+        let url = format!("{}/block/latest", self.config.base_url);
+        self.get(&url).await
+    }
+
+    /// Obtain user status information (without relying on specific blocks)
+    ///
+    /// # Example
+    /// ```
+    /// let client = FlashbotsClient::new_mainnet();
+    /// let address = Address::zero(); // real address
+    /// let user_status = client.get_user_status(address).await?;
+    /// println!("User reputation: {:?}", user_status.reputation);
+    /// ```
+    pub async fn get_user_status(&self, address: Address) -> FlashbotsResult<UserStatus> {
+        let url = format!("{}/userStatus/{}", self.config.base_url, address);
+        self.get(&url).await
+    }
+
+    /// Get recommended gas prices
+    ///
+    /// # Example
+    /// ```
+    /// let client = FlashbotsClient::new_mainnet();
+    /// let gas_prices = client.get_gas_price().await?;
+    /// println!("Fast gas price: {}", gas_prices.fast_gas_price);
+    /// ```
+    pub async fn get_gas_price(&self) -> FlashbotsResult<GasPriceResponse> {
+        let url = format!("{}/gasPrice", self.config.base_url);
+        self.get(&url).await
+    }
+
+    /// Get the list of API endpoints supported by the repeater.
+    pub async fn get_supported_endpoints(&self) -> FlashbotsResult<Vec<String>> {
+        let url = format!("{}/", self.config.base_url);
+        let response: Value = self.get(&url).await?;
+        Ok(response
+            .get("supported_apis")
+            .and_then(|apis| apis.as_array())
+            .map(|apis| {
+                apis.iter()
+                    .filter_map(|api| api.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// Get repeater information
+    ///
+    /// # Example
+    /// ```
+    /// use flashbots_rs::FlashbotsClient;
+    ///
+    /// let client = FlashbotsClient::new_mainnet();
+    /// let relay_info = client.get_relay_info().await?;
+    /// println!("Relay: {} v{}", relay_info.name, relay_info.version);
+    /// ```
+    pub async fn get_relay_info(&self) -> FlashbotsResult<RelayInfo> {
+        let url = format!("{}/", self.config.base_url);
+        self.get(&url).await
+    }
+
+    /// Batch Transaction Package Receipts
+    pub async fn get_bundle_receipts(
+        &self,
+        bundle_hashes: Vec<H256>,
+    ) -> FlashbotsResult<Vec<BundleReceipt>> {
+        let mut receipts = Vec::new();
+        for bundle_hash in bundle_hashes {
+            match self.get_bundle_receipt(bundle_hash).await {
+                Ok(receipt) => receipts.push(receipt),
+                Err(e) => {
+                    log::warn!(
+                        "Failed to get receipt for bundle {:?}: {:?}",
+                        bundle_hash,
+                        e
+                    );
+                }
+            }
+        }
+        Ok(receipts)
+    }
+
+    /// Check if multiple transaction packages have been included.
+    pub async fn check_bundle_inclusions(
+        &self,
+        bundle_hashes: Vec<H256>,
+    ) -> FlashbotsResult<Vec<(H256, bool)>> {
+        let mut results = Vec::new();
+        for bundle_hash in bundle_hashes {
+            let is_included = self.get_bundle_receipt(bundle_hash).await.is_ok();
+            results.push((bundle_hash, is_included));
+        }
+        Ok(results)
+    }
+
+    /// Send transaction package and get receipt (simplified version)
+    pub async fn send_bundle_and_get_receipt(
+        &self,
+        bundle: Bundle,
+        timeout_blocks: u64,
+    ) -> FlashbotsResult<BundleReceipt> {
+        let response = self.send_bundle_with_retry(bundle).await?;
+        log::info!("Bundle sent successfully, hash: {:?}", response.bundle_hash);
+        match self
+            .wait_for_bundle_inclusion(response.bundle_hash, timeout_blocks)
+            .await?
+        {
+            Some(receipt) => Ok(receipt),
+            None => Err(FlashbotsError::Error(
+                "Bundle not included within timeout".to_string(),
+            )),
+        }
+    }
+
+    /// Verify transaction package format
+    pub async fn validate_bundle(&self, bundle: &Bundle) -> FlashbotsResult<bool> {
+        if bundle.txs.is_empty() {
+            return Err(FlashbotsError::Error(
+                "Bundle must contain at least one transaction".to_string(),
+            ));
+        }
+        // Check block number
+        if bundle
+            .block_number
+            .ok_or(|| FlashbotsError::Error(format!("block number is empty")))
+            .is_err()
+            || bundle.block_number.unwrap().is_zero()
+        {
+            return Err(FlashbotsError::Error(
+                "Bundle must have a valid block number".to_string(),
+            ));
+        }
+        // Check the timestamp range (if any).
+        if let (Some(min_ts), Some(max_ts)) = (bundle.min_timestamp, bundle.max_timestamp) {
+            if min_ts > max_ts {
+                return Err(FlashbotsError::Error(
+                    "Invalid timestamp range: min_timestamp > max_timestamp".to_string(),
+                ));
+            }
+        }
+        Ok(true)
+    }
+
+    /// Obtain repeater performance statistics
+    pub async fn get_relay_stats(&self) -> FlashbotsResult<Value> {
+        let url = format!("{}/relayStats", self.config.base_url);
+        self.get(&url).await
+    }
+
+    /// Get Builder Information
+    pub async fn get_builder_info(&self) -> FlashbotsResult<Value> {
+        let url = format!("{}/builder", self.config.base_url);
+        self.get(&url).await
+    }
+
+    /// Batch simulated trading package
+    pub async fn simulate_bundles(
+        &self,
+        simulations: Vec<SimulateBundleRequest>,
+    ) -> FlashbotsResult<Vec<FlashbotsResult<SimulateBundleResponse>>> {
+        let mut results = Vec::new();
+        for simulation in simulations {
+            let result = self.simulate_bundle_with_retry(simulation).await;
+            results.push(result);
+        }
+        Ok(results)
+    }
+
+    /// Send the transaction package and cancel it immediately (for testing purposes).
+    pub async fn send_and_cancel_bundle(&self, bundle: Bundle) -> FlashbotsResult<bool> {
+        let response = self.send_bundle_with_retry(bundle).await?;
+        log::info!(
+            "Bundle sent, attempting to cancel: {:?}",
+            response.bundle_hash
+        );
+        let cancel_result = self.cancel_bundles(vec![response.bundle_hash]).await?;
+        Ok(cancel_result.success)
+    }
+
+    /// Get network information
+    pub async fn get_network_info(&self) -> FlashbotsResult<Value> {
+        let url = format!("{}/network", self.config.base_url);
+        self.get(&url).await
+    }
+
+    /// Check if the address is blacklisted.
+    pub async fn is_blacklisted(&self, address: Address) -> FlashbotsResult<bool> {
+        let user_status = self.get_user_status(address).await?;
+        Ok(user_status.blacklisted)
+    }
+
+    /// Get repeater version
+    pub async fn get_version(&self) -> FlashbotsResult<String> {
+        let relay_info = self.get_relay_info().await?;
+        Ok(relay_info.version)
     }
 }
 

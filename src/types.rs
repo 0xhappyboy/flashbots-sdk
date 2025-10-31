@@ -1,4 +1,4 @@
-use ethers::types::{H256, U64, U256};
+use ethers::types::{Address, H256, U64, U256};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,6 +79,62 @@ pub struct RelayStatus {
 pub struct BundlePriceResponse {
     pub percentage: Option<f64>,
     pub number: Option<U64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelBundlesRequest {
+    pub bundle_hashes: Vec<H256>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelBundlesResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GasPriceResponse {
+    pub last_block_gas_price: u64,
+    pub safe_low_gas_price: u64,
+    pub standard_gas_price: u64,
+    pub fast_gas_price: u64,
+    pub fastest_gas_price: u64,
+    pub block_number: U64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockResponse {
+    pub block_number: U64,
+    pub miner: Address,
+    pub base_fee_per_gas: U256,
+    pub gas_used: U256,
+    pub gas_limit: U256,
+    pub timestamp: u64,
+    pub bundles: Vec<BundleReceipt>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserStatus {
+    pub is_high_priority: bool,
+    pub reputation: Option<f64>,
+    pub blacklisted: bool,
+    pub max_gas_price: Option<U256>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelayInfo {
+    pub name: String,
+    pub version: String,
+    pub supported_apis: Vec<String>,
+    pub network: String,
+    pub chain_id: u64,
+    pub builder: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BundleByHashResponse {
+    pub bundle: Bundle,
+    pub receipt: Option<BundleReceipt>,
 }
 
 #[derive(Debug)]
